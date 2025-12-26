@@ -11,14 +11,34 @@ class S3Uploader:
     """AWS S3 uploader for video files"""
 
     def __init__(self):
+        # Validate required environment variables
+        self.region = os.getenv('S3_REGION')
+        self.access_key = os.getenv('S3_ACCESS_KEY')
+        self.secret_key = os.getenv('S3_SECRET_KEY')
+        self.bucket_name = os.getenv('S3_BUCKET_NAME')
+
+        missing_vars = []
+        if not self.region:
+            missing_vars.append('S3_REGION')
+        if not self.access_key:
+            missing_vars.append('S3_ACCESS_KEY')
+        if not self.secret_key:
+            missing_vars.append('S3_SECRET_KEY')
+        if not self.bucket_name:
+            missing_vars.append('S3_BUCKET_NAME')
+
+        if missing_vars:
+            raise ValueError(
+                f"Missing required S3 environment variables: {', '.join(missing_vars)}. "
+                f"Please set these variables in your environment or .env file."
+            )
+
         self.s3_client = boto3.client(
             's3',
-            region_name=os.getenv('S3_REGION'),
-            aws_access_key_id=os.getenv('S3_ACCESS_KEY'),
-            aws_secret_access_key=os.getenv('S3_SECRET_KEY')
+            region_name=self.region,
+            aws_access_key_id=self.access_key,
+            aws_secret_access_key=self.secret_key
         )
-        self.bucket_name = os.getenv('S3_BUCKET_NAME')
-        self.region = os.getenv('S3_REGION')
 
     async def upload_video_to_s3(self, file_path: str, custom_file_name: str = None) -> str:
         """
