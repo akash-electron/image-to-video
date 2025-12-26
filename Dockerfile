@@ -13,6 +13,11 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     ffmpeg \
     libavcodec-extra \
+    libx264-dev \
+    x264 \
+    libavformat-dev \
+    libswscale-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

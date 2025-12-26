@@ -186,14 +186,41 @@ async def create_video(request: VideoRequest):
         temp_video_path = temp_video.name
         temp_video.close()
 
-        # Initialize video writer
-        fourcc = cv2.VideoWriter_fourcc(*"avc1")
-        video = cv2.VideoWriter(temp_video_path, fourcc, request.fps, (w, h))
+        # Initialize video writer with codec fallback
+        # Try multiple codecs in order of preference
+        codecs_to_try = [
+            ("avc1", "H.264 (avc1)"),      # Best quality, most compatible
+            ("X264", "H.264 (X264)"),      # Alternative H.264
+            ("mp4v", "MPEG-4"),            # Fallback codec
+            ("MP4V", "MPEG-4 uppercase"),  # Case variation
+        ]
 
-        if not video.isOpened():
+        video = None
+        successful_codec = None
+
+        for codec, codec_name in codecs_to_try:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec)
+                video = cv2.VideoWriter(temp_video_path, fourcc, request.fps, (w, h))
+
+                if video.isOpened():
+                    successful_codec = codec_name
+                    print(f"✓ Video writer initialized successfully with {codec_name}")
+                    break
+                else:
+                    video.release()
+                    video = None
+            except Exception as e:
+                print(f"✗ Failed to initialize with {codec_name}: {str(e)}")
+                if video:
+                    video.release()
+                    video = None
+                continue
+
+        if not video or not video.isOpened():
             raise HTTPException(
                 status_code=500,
-                detail="Failed to initialize video writer"
+                detail="Failed to initialize video writer with any codec. Please check FFmpeg installation."
             )
 
         # Get transition function
@@ -403,14 +430,41 @@ async def create_video_upload(
         temp_video_path = temp_video.name
         temp_video.close()
 
-        # Initialize video writer
-        fourcc = cv2.VideoWriter_fourcc(*"avc1")
-        video = cv2.VideoWriter(temp_video_path, fourcc, fps, (w, h))
+        # Initialize video writer with codec fallback
+        # Try multiple codecs in order of preference
+        codecs_to_try = [
+            ("avc1", "H.264 (avc1)"),      # Best quality, most compatible
+            ("X264", "H.264 (X264)"),      # Alternative H.264
+            ("mp4v", "MPEG-4"),            # Fallback codec
+            ("MP4V", "MPEG-4 uppercase"),  # Case variation
+        ]
 
-        if not video.isOpened():
+        video = None
+        successful_codec = None
+
+        for codec, codec_name in codecs_to_try:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec)
+                video = cv2.VideoWriter(temp_video_path, fourcc, fps, (w, h))
+
+                if video.isOpened():
+                    successful_codec = codec_name
+                    print(f"✓ Video writer initialized successfully with {codec_name}")
+                    break
+                else:
+                    video.release()
+                    video = None
+            except Exception as e:
+                print(f"✗ Failed to initialize with {codec_name}: {str(e)}")
+                if video:
+                    video.release()
+                    video = None
+                continue
+
+        if not video or not video.isOpened():
             raise HTTPException(
                 status_code=500,
-                detail="Failed to initialize video writer"
+                detail="Failed to initialize video writer with any codec. Please check FFmpeg installation."
             )
 
         # Get transition function
