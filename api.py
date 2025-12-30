@@ -11,6 +11,7 @@ from transitions import TRANSITIONS
 import io
 import shutil
 import requests
+import subprocess
 from s3_upload import s3_uploader
 
 app = FastAPI(
@@ -295,6 +296,51 @@ async def create_video(request: VideoRequest):
         # Release video writer
         video.release()
 
+        # Re-encode with FFmpeg to ensure proper metadata (fix for Docker MPEG-4 codec issue)
+        # This ensures duration and other metadata are correctly written
+        temp_reencoded = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        temp_reencoded_path = temp_reencoded.name
+        temp_reencoded.close()
+
+        try:
+            # Use FFmpeg to re-encode with H.264 and ensure proper metadata
+            ffmpeg_cmd = [
+                'ffmpeg',
+                '-i', temp_video_path,
+                '-c:v', 'libx264',           # Use H.264 codec
+                '-preset', 'fast',            # Fast encoding
+                '-crf', '23',                 # Good quality
+                '-movflags', '+faststart',    # Optimize for streaming
+                '-y',                         # Overwrite output file
+                temp_reencoded_path
+            ]
+
+            result = subprocess.run(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=120  # 2 minutes timeout
+            )
+
+            if result.returncode == 0:
+                # Replace original with re-encoded version
+                os.replace(temp_reencoded_path, temp_video_path)
+                print("✓ Video re-encoded with FFmpeg for proper metadata")
+            else:
+                # If FFmpeg fails, log but continue with original file
+                print(f"⚠ FFmpeg re-encoding failed (using original): {result.stderr.decode()}")
+                if os.path.exists(temp_reencoded_path):
+                    os.unlink(temp_reencoded_path)
+
+        except subprocess.TimeoutExpired:
+            print("⚠ FFmpeg re-encoding timed out (using original)")
+            if os.path.exists(temp_reencoded_path):
+                os.unlink(temp_reencoded_path)
+        except Exception as e:
+            print(f"⚠ FFmpeg re-encoding error (using original): {str(e)}")
+            if os.path.exists(temp_reencoded_path):
+                os.unlink(temp_reencoded_path)
+
         # Calculate video metadata (using actual frame counts for accurate duration)
         num_images = len(processed_images)
         actual_image_duration = image_frames / request.fps
@@ -495,6 +541,47 @@ async def create_video_upload(
 
         # Release video writer
         video.release()
+
+        # Re-encode with FFmpeg to ensure proper metadata (fix for Docker MPEG-4 codec issue)
+        temp_reencoded = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        temp_reencoded_path = temp_reencoded.name
+        temp_reencoded.close()
+
+        try:
+            ffmpeg_cmd = [
+                'ffmpeg',
+                '-i', temp_video_path,
+                '-c:v', 'libx264',
+                '-preset', 'fast',
+                '-crf', '23',
+                '-movflags', '+faststart',
+                '-y',
+                temp_reencoded_path
+            ]
+
+            result = subprocess.run(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=120
+            )
+
+            if result.returncode == 0:
+                os.replace(temp_reencoded_path, temp_video_path)
+                print("✓ Video re-encoded with FFmpeg for proper metadata")
+            else:
+                print(f"⚠ FFmpeg re-encoding failed (using original): {result.stderr.decode()}")
+                if os.path.exists(temp_reencoded_path):
+                    os.unlink(temp_reencoded_path)
+
+        except subprocess.TimeoutExpired:
+            print("⚠ FFmpeg re-encoding timed out (using original)")
+            if os.path.exists(temp_reencoded_path):
+                os.unlink(temp_reencoded_path)
+        except Exception as e:
+            print(f"⚠ FFmpeg re-encoding error (using original): {str(e)}")
+            if os.path.exists(temp_reencoded_path):
+                os.unlink(temp_reencoded_path)
 
         # Calculate video metadata
         num_images = len(processed_images)
