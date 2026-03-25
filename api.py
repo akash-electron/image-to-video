@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Body
 from fastapi.responses import FileResponse, JSONResponse
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, HttpUrl, field_validator
 import cv2
 import numpy as np
@@ -29,6 +29,7 @@ class VideoRequest(BaseModel):
     image_duration: float = 1.5
     transition_duration: float = 1.0
     upload_to_s3: bool = True
+    updatedAt: Optional[int] = None
 
     @field_validator('image_urls')
     @classmethod
@@ -356,7 +357,7 @@ async def create_video(request: VideoRequest):
             try:
                 # Generate filename using propertyId: EasyPost_{propertyId}_0.mp4
                 filename = f"EasyPost_{request.propertyId}_0.mp4"
-                s3_url = await s3_uploader.upload_video_to_s3(temp_video_path, filename)
+                s3_url = await s3_uploader.upload_video_to_s3(temp_video_path, filename, updated_at=request.updatedAt)
 
                 # Clean up temp file
                 if os.path.exists(temp_video_path):
