@@ -42,7 +42,7 @@ class S3Uploader:
             aws_secret_access_key=self.secret_key
         )
 
-    async def upload_video_to_s3(self, file_path: str, custom_file_name: str = None) -> str:
+    async def upload_video_to_s3(self, file_path: str, custom_file_name: str = None, updated_at=None) -> str:
         """
         Upload a video file to S3
 
@@ -81,6 +81,9 @@ class S3Uploader:
 
             # Generate public URL
             public_url = f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{s3_key}"
+
+            if updated_at is not None:
+                public_url = f"{public_url}?v={updated_at}"
 
             print(f"✅ Video uploaded to S3: {public_url}")
             return public_url
